@@ -31,13 +31,13 @@ export function useReplayMetadata() {
         setError(false);
         setTitle(title ?? null);
         if (title) {
-          document.title = `${title} - DeerFlow`;
+          document.title = `${title} - 国寿投资深度研究智能体平台`;
         }
       })
       .catch(() => {
         setError(true);
         setTitle("Error: the replay is not available.");
-        document.title = "DeerFlow";
+        document.title = "国寿投资深度研究智能体平台";
       })
       .finally(() => {
         isLoading.current = false;

@@ -194,7 +194,7 @@ export function MessagesBlock({ className }: { className?: string }) {
                         location.href = "/chat";
                       }}>
                         <CornerDownLeft size={16} />
-                        Return
+                        返回
                       </Button>
                     )}
                   </div>
@@ -204,14 +204,6 @@ export function MessagesBlock({ className }: { className?: string }) {
             {!replayStarted && env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY && (
               <div className="text-muted-foreground w-full text-center text-xs">
                 {t("demoNotice")}{" "}
-                <a
-                  className="underline"
-                  href="https://github.com/bytedance/deer-flow"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {t("clickHere")}
-                </a>{" "}
                 {t("cloneLocally")}
               </div>
             )}

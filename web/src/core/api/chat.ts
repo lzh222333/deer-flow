@@ -22,7 +22,7 @@ function getLocaleFromCookie(): string {
   const LOCALE_MAP = { "en": "en-US", "zh": "zh-CN" } as const;
   
   // Initialize to raw locale format (matches cookie format)
-  let rawLocale = "en";
+  let rawLocale = "zh";
   
   // Read from cookie
   const cookies = document.cookie.split(";");

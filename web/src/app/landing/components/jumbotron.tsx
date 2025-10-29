@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 // SPDX-License-Identifier: MIT
 
-import { GithubFilled } from "@ant-design/icons";
+// removed GitHub button for privatization
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from 'next-intl';
@@ -51,31 +51,12 @@ export function Jumbotron() {
               target={
                 env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY ? "_blank" : undefined
               }
-              href={
-                env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY
-                  ? "https://github.com/bytedance/deer-flow"
-                  : "/chat"
-              }
+              href={"/chat"}
             >
               {tCommon('getStarted')} <ChevronRight />
             </Link>
           </Button>
-          {!env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY && (
-            <Button
-              className="w-42 text-lg"
-              size="lg"
-              variant="outline"
-              asChild
-            >
-              <Link
-                href="https://github.com/bytedance/deer-flow"
-                target="_blank"
-              >
-                <GithubFilled />
-                {tCommon('learnMore')}
-              </Link>
-            </Button>
-          )}
+          {/* GitHub 入口移除，便于私有化部署 */}
         </div>
       </div>
       <div className="absolute bottom-8 flex text-xs opacity-50">

@@ -1,4 +1,4 @@
-# 🦌 [关于 DeerFlow](https://github.com/bytedance/deer-flow)
+# 🦌 关于 国寿投资深度研究智能体平台
 
 > **源于开源，回馈开源**
 
@@ -8,7 +8,7 @@
 
 ## 🌟 GitHub 仓库
 
-在 GitHub 上探索 DeerFlow：[github.com/bytedance/deer-flow](https://github.com/bytedance/deer-flow)
+本平台为企业内部私有化部署版本，已移除外部 GitHub 入口。
 
 ---
 

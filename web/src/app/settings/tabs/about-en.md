@@ -1,4 +1,4 @@
-# 🦌 [About DeerFlow](https://github.com/bytedance/deer-flow)
+# 🦌 About the Platform
 
 > **From Open Source, Back to Open Source**
 
@@ -8,7 +8,7 @@
 
 ## 🌟 GitHub Repository
 
-Explore DeerFlow on GitHub: [github.com/bytedance/deer-flow](https://github.com/bytedance/deer-flow)
+This deployment is private. Public GitHub links are removed.
 
 ---
 

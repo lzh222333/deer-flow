@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 // SPDX-License-Identifier: MIT
 
-import { StarFilledIcon, GitHubLogoIcon } from "@radix-ui/react-icons";
+import { StarFilledIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 import { useTranslations } from 'next-intl';
 
@@ -18,7 +18,7 @@ export function SiteHeader() {
       <div className="container flex h-15 items-center justify-between px-3">
         <div className="text-xl font-medium">
           <span className="mr-1 text-2xl">🦌</span>
-          <span>DeerFlow</span>
+          <span>国寿投资深度研究智能体平台</span>
         </div>
         <div className="relative flex items-center gap-2">
           <LanguageSwitcher />
@@ -29,19 +29,7 @@ export function SiteHeader() {
               filter: "blur(32px)",
             }}
           />
-          <Button
-            variant="outline"
-            size="sm"
-            asChild
-            className="group relative z-10"
-          >
-            <Link href="https://github.com/bytedance/deer-flow" target="_blank">
-              <GitHubLogoIcon className="size-4" />
-              {t('starOnGitHub')}
-              {env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY &&
-                env.GITHUB_OAUTH_TOKEN && <StarCounter />}
-            </Link>
-          </Button>
+          {/* GitHub 按钮移除以便私有化 */}
         </div>
       </div>
       <hr className="from-border/0 via-border/70 to-border/0 m-0 h-px w-full border-none bg-gradient-to-r" />

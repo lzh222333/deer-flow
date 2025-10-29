@@ -9,7 +9,7 @@ export function Logo() {
       className="opacity-70 transition-opacity duration-300 hover:opacity-100"
       href="/"
     >
-      🦌 DeerFlow
+      国寿投资深度研究智能体平台
     </Link>
   );
 }
