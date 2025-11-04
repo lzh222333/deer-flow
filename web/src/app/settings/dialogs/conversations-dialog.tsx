@@ -57,9 +57,9 @@ export function ConversationsDialog() {
             </Tooltip>
             <DialogContent className="sm:max-w-[860px]">
                 <DialogHeader>
-                    <DialogTitle>Conversations</DialogTitle>
+                    <DialogTitle>对话历史</DialogTitle>
                     <DialogDescription>
-                        Replay your conversations here.
+                        在这里回放您的对话历史。
                     </DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-wrap h-130 w-full overflow-auto border-y">
@@ -131,7 +131,7 @@ export function ConversationsDialog() {
 
                                         }}>
                                             <Play size={16} />
-                                            Replay
+                                            回放
                                         </Button>
                                     </div>
                                 </div>
@@ -144,7 +144,7 @@ export function ConversationsDialog() {
 
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setOpen(false)}>
-                        Close
+                        关闭
                     </Button>
                 </DialogFooter>
             </DialogContent>
