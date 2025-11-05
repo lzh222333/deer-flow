@@ -255,7 +255,7 @@ class FastGPTProvider(Retriever):
             logger.info(f"Making request to FastGPT retrieve API: {self.api_url}{self.retrieve_api_path}")
             logger.info(f"Request payload: {payload}")
             
-            # 调用FastGPT的检索API
+            # 调用FastGPT的检索API，根据用户反馈改为POST请求
             response = requests.post(
                 f"{self.api_url}{self.retrieve_api_path}",
                 headers=headers,
@@ -266,15 +266,31 @@ class FastGPTProvider(Retriever):
             logger.info(f"API response status code: {response.status_code}")
             
             if response.status_code != 200:
-                raise Exception(f"Failed to query documents: {response.status_code} - {response.text}")
+                logger.error(f"Failed to query documents: {response.status_code} - Response content type: {response.headers.get('content-type')}")
+                # 处理非JSON响应
+                if 'html' in response.headers.get('content-type', '').lower():
+                    logger.error("Received HTML response instead of JSON")
+                    # 返回空列表而不是抛出异常，避免前端JSON解析错误
+                    return documents
+                raise Exception(f"Failed to query documents: {response.status_code}")
             
-            result = response.json()
+            # 安全地尝试解析JSON
+            try:
+                result = response.json()
+            except ValueError:
+                logger.error("Failed to parse JSON response")
+                # 返回空列表而不是抛出异常，避免前端JSON解析错误
+                return documents
             
             # 检查响应格式
             if result.get("code") != 200:
                 raise Exception(f"API returned error code: {result.get('code')}, message: {result.get('message')}")
             
             # 处理返回的数据，考虑多种可能的响应格式
+            if result.get("code") != 200:
+                logger.error(f"API returned error code: {result.get('code')}, message: {result.get('message')}")
+                return documents
+                
             data = result.get("data", {})
             # 支持多种可能的文档列表键名
             chunks = data.get("documents", [])
@@ -320,6 +336,7 @@ class FastGPTProvider(Retriever):
             
         except Exception as e:
             logger.error(f"Error fetching from dataset {dataset_id}: {e}")
+            # 捕获异常并返回空列表，确保不会有格式错误的响应
         
         return documents
 
