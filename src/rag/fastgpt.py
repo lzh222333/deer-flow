@@ -147,6 +147,7 @@ class FastGPTProvider(Retriever):
                     raise Exception(f"API returned error code: {result.get('code')}")
 
                 search_results = result.get("data", [])
+                search_results = search_results.get("list", [])
                 
                 # Group results by sourceName if available
                 for item in search_results:
@@ -156,8 +157,8 @@ class FastGPTProvider(Retriever):
                         similarity = 0.0
                         source_name = "Unknown Source"
                     else:
-                        content = item.get("q", "") if isinstance(item, dict) else str(item)
-                        similarity = item.get("score", 0.0) if isinstance(item, dict) else 0.0
+                        content = item.get("q", "") + "\n" + item.get("a", "") if isinstance(item, dict) else str(item)
+                        similarity = item.get("score", [{'value': 0}])[0].get("value", 0.0) if isinstance(item, dict) else 0.0
                         source_name = item.get("sourceName", "Unknown Source") if isinstance(item, dict) else "Unknown Source"
 
                     # Use sourceName as document title and create a unique ID
