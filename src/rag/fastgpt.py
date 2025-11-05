@@ -45,7 +45,14 @@ class FastGPTProvider(Retriever):
     def query_relevant_documents(
         self, query: str, resources: list[Resource] = []
     ) -> list[Document]:
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.info(f"Querying relevant documents with query: {query}")
+        logger.info(f"Number of resources provided: {len(resources)}")
+        
         if not resources:
+            logger.info("No resources provided, returning empty list")
             return []
 
         headers = {
@@ -60,18 +67,25 @@ class FastGPTProvider(Retriever):
                 dataset_id, _ = parse_uri(resource.uri)
                 if dataset_id:
                     dataset_ids.append(dataset_id)
+                    logger.info(f"Added dataset ID: {dataset_id} from resource: {resource.uri}")
             except Exception as e:
-                print(f"Warning: Failed to parse resource URI {resource.uri}: {e}")
+                logger.warning(f"Failed to parse resource URI {resource.uri}: {e}")
 
         if not dataset_ids:
+            logger.warning("No valid dataset IDs found in provided resources")
             return []
 
+        logger.info(f"Will query the following dataset IDs: {dataset_ids}")
+        
         # 构建请求参数
         payload = {
             "question": query,
             "datasetIds": dataset_ids,
             "topK": self.page_size
         }
+
+        logger.info(f"Making request to FastGPT retrieve API: {self.api_url}{self.retrieve_api_path}")
+        logger.info(f"Request payload: {payload}")
 
         try:
             # 调用FastGPT的检索API
@@ -81,6 +95,9 @@ class FastGPTProvider(Retriever):
                 json=payload,
                 timeout=30  # 添加超时设置
             )
+
+            logger.info(f"API response status code: {response.status_code}")
+            logger.info(f"API response text: {response.text}")
 
             if response.status_code != 200:
                 raise Exception(f"Failed to query documents: {response.status_code} - {response.text}")
@@ -100,6 +117,8 @@ class FastGPTProvider(Retriever):
             if not chunks:
                 chunks = data.get("items", [])
             
+            logger.info(f"Retrieved {len(chunks)} chunks from FastGPT API")
+            
             # 按文档ID分组
             docs_dict: dict[str, Document] = {}
             
@@ -114,6 +133,7 @@ class FastGPTProvider(Retriever):
                 score = chunk_data.get("score", 0.0) or chunk_data.get("similarity", 0.0)
                 
                 if not doc_id:
+                    logger.warning(f"Skipping chunk without document ID: {chunk_data}")
                     continue
                 
                 if doc_id not in docs_dict:
@@ -122,36 +142,62 @@ class FastGPTProvider(Retriever):
                         title=doc_name or f"Document {doc_id}",
                         chunks=[]
                     )
+                    logger.info(f"Created new document: ID={doc_id}, Title={docs_dict[doc_id].title}")
                 
                 # 添加chunk到对应的文档
                 chunk = Chunk(content=content, similarity=float(score))
                 docs_dict[doc_id].chunks.append(chunk)
+                logger.debug(f"Added chunk to document {doc_id} with similarity score: {score}")
             
+            logger.info(f"Successfully created {len(docs_dict)} documents from chunks")
             return list(docs_dict.values())
             
         except requests.Timeout:
+            logger.error("Request to FastGPT API timed out")
             raise Exception("Request to FastGPT API timed out")
         except requests.RequestException as e:
+            logger.error(f"Network error when querying FastGPT API: {e}")
             raise Exception(f"Network error when querying FastGPT API: {e}")
+        except Exception as e:
+            logger.error(f"Error querying FastGPT API: {e}")
+            raise
 
     def list_resources(self, query: str | None = None) -> list[Resource]:
+        import logging
+        logger = logging.getLogger(__name__)
+        
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
 
+        # 根据API文档，使用POST请求并通过请求体发送参数
+        payload = {
+            "parentId": ""  # 根目录下的知识库，空字符串或null
+        }
+        
+        # 查询参数
         params = {}
         if query:
             params["name"] = query
+            logger.info(f"Filtering resources with query: {query}")
+
+        logger.info(f"Making request to FastGPT API: {self.api_url}{self.list_api_path}")
+        logger.info(f"Request headers: {headers}")
+        logger.info(f"Request payload: {payload}")
 
         try:
-            # 调用FastGPT的获取知识库列表API
-            response = requests.get(
+            # 调用FastGPT的获取知识库列表API，使用POST请求
+            response = requests.post(
                 f"{self.api_url}{self.list_api_path}",
                 headers=headers,
                 params=params,
+                json=payload,
                 timeout=30  # 添加超时设置
             )
+
+            logger.info(f"API response status code: {response.status_code}")
+            logger.info(f"API response text: {response.text}")
 
             if response.status_code != 200:
                 raise Exception(f"Failed to list resources: {response.status_code} - {response.text}")
@@ -164,26 +210,23 @@ class FastGPTProvider(Retriever):
 
             resources = []
             
-            # 处理返回的数据，考虑多种可能的响应格式
-            data = result.get("data", [])
-            # 支持多种可能的数据列表格式
-            if isinstance(data, dict):
-                items = data.get("items", [])
-                if not items:
-                    items = data.get("datasets", [])
-            else:
-                items = data
-                
+            # 处理返回的数据，根据API文档直接使用data数组
+            items = result.get("data", [])
+            logger.info(f"Retrieved {len(items)} resources from FastGPT")
+            
             for item in items:
-                # 支持多种可能的ID键名
-                dataset_id = item.get("id") or item.get("datasetId")
+                # 从API响应示例中可以看到ID字段是_id
+                dataset_id = item.get("_id") or item.get("id") or item.get("datasetId")
                 # 支持多种可能的名称键名
                 name = item.get("name", "") or item.get("title", "")
                 # 支持多种可能的描述键名
-                description = item.get("description", "") or item.get("desc", "")
+                description = item.get("intro", "") or item.get("description", "") or item.get("desc", "")
                 
                 if not dataset_id:
+                    logger.warning(f"Skipping item without ID: {item}")
                     continue
+                
+                logger.info(f"Found resource: ID={dataset_id}, Name={name}")
                 
                 resource = Resource(
                     uri=f"rag://dataset/{dataset_id}",
@@ -192,12 +235,18 @@ class FastGPTProvider(Retriever):
                 )
                 resources.append(resource)
 
+            logger.info(f"Successfully parsed {len(resources)} resources")
             return resources
             
         except requests.Timeout:
+            logger.error("Request to FastGPT API timed out")
             raise Exception("Request to FastGPT API timed out")
         except requests.RequestException as e:
+            logger.error(f"Network error when listing FastGPT resources: {e}")
             raise Exception(f"Network error when listing FastGPT resources: {e}")
+        except Exception as e:
+            logger.error(f"Error listing FastGPT resources: {e}")
+            raise
 
 
 def parse_uri(uri: str) -> tuple[str, str]:
