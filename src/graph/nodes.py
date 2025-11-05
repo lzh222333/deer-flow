@@ -977,16 +977,36 @@ async def _setup_and_execute_agent_step(
         client = MultiServerMCPClient(mcp_servers)
         loaded_tools = default_tools[:]
         all_tools = await client.get_tools()
+        
+        # Log all available tools before filtering
+        logger.info(f"[工具列表] 可用的MCP工具总数: {len(all_tools)}")
+        logger.info(f"[工具列表] 启用的MCP工具: {list(enabled_tools.keys())}")
+
+        # Collect dynamic tools information for prompt template
+        dynamic_tools = []
+        
         for tool in all_tools:
             if tool.name in enabled_tools:
                 tool.description = (
                     f"Powered by '{enabled_tools[tool.name]}'.\n{tool.description}"
                 )
                 loaded_tools.append(tool)
+                logger.info(f"[使用工具] {tool.name}")
+                # Add tool information for prompt template
+                dynamic_tools.append({"name": tool.name, "description": tool.description})
+        
+        # Add dynamic_tools to state for prompt template rendering
+        state["dynamic_tools"] = dynamic_tools
+        
         agent = create_agent(agent_type, agent_type, loaded_tools, agent_type)
         return await _execute_agent_step(state, config, agent, agent_type)
     else:
+        # Log default tools when no MCP servers are configured
+        logger.info(f"未配置MCP服务器，使用默认工具")
         # Use default tools if no MCP servers are configured
+        # Set dynamic_tools to empty list for prompt template
+        state["dynamic_tools"] = []
+        
         agent = create_agent(agent_type, agent_type, default_tools, agent_type)
         return await _execute_agent_step(state, config, agent, agent_type)
 

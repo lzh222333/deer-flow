@@ -17,11 +17,12 @@ You have access to two types of tools:
    - **web_search**: For performing web searches (NOT "web_search_tool")
    - **crawl_tool**: For reading content from URLs
 
-2. **Dynamic Loaded Tools**: Additional tools that may be available depending on the configuration. These tools are loaded dynamically and will appear in your available tools list. Examples include:
-   - Specialized search tools
-   - Google Map tools
-   - Database Retrieval tools
-   - And many others
+2. **Dynamic Loaded Tools**: Additional tools that may be available depending on the configuration. These tools are loaded dynamically and will appear in your available tools list. {% if dynamic_tools %}
+   **Currently available dynamic tools:**
+   {% for tool in dynamic_tools %}
+   - **{{ tool.name }}**: {{ tool.description }}
+   {% endfor %}{% else %}
+   **No dynamic tools currently available.**{% endif %}
 
 ## How to Use Dynamic Loaded Tools
 
