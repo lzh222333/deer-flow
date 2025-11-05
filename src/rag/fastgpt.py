@@ -1,10 +1,14 @@
 # Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: MIT
 
+import logging
 import os
 import requests
 
 from src.rag.retriever import Chunk, Document, Resource, Retriever
+
+# Configure logger
+logger = logging.getLogger(__name__)
 
 
 def parse_uri(uri: str) -> tuple[str, str]:
@@ -95,6 +99,10 @@ class FastGPTProvider(Retriever):
                     or query_lower in (r.description or "").lower()
                 ]
 
+            # Log the retrieved resources
+            resource_info = [f"{{id: {r.uri}, title: {r.title}}}" for r in resources]
+            logger.info(f"FastGPT - Retrieved {len(resources)} knowledge bases: {', '.join(resource_info[:5])}{'...' if len(resource_info) > 5 else ''}")
+
             return resources
 
         except Exception as e:
@@ -142,9 +150,15 @@ class FastGPTProvider(Retriever):
                 
                 # Group results by sourceName if available
                 for item in search_results:
-                    content = item.get("q", "")
-                    similarity = item.get("score", 0.0)
-                    source_name = item.get("sourceName", "Unknown Source")
+                    # Handle case where item might be a string instead of a dict
+                    if isinstance(item, str):
+                        content = item
+                        similarity = 0.0
+                        source_name = "Unknown Source"
+                    else:
+                        content = item.get("q", "") if isinstance(item, dict) else str(item)
+                        similarity = item.get("score", 0.0) if isinstance(item, dict) else 0.0
+                        source_name = item.get("sourceName", "Unknown Source") if isinstance(item, dict) else "Unknown Source"
 
                     # Use sourceName as document title and create a unique ID
                     doc_id = f"{dataset_id}_{source_name}"
@@ -170,6 +184,13 @@ class FastGPTProvider(Retriever):
             key=lambda doc: sum(chunk.similarity for chunk in doc.chunks),
             reverse=True,
         )
+        
+        # Log the query results
+        if document_list:
+            # Create a concise log entry with first document's title and truncated content
+            first_doc = document_list[0]
+            first_chunk_content = first_doc.chunks[0].content[:100] + ('...' if len(first_doc.chunks[0].content) > 100 else '')
+            logger.info(f"FastGPT - Query '{query}' returned {len(document_list)} documents. First document: '{first_doc.title}' with content: '{first_chunk_content}'")
 
         # Return top_k documents
         return document_list[: self.top_k]
