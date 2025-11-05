@@ -336,25 +336,25 @@ class FastGPTProvider(Retriever):
         
         try:
             # 1. 首先获取知识库列表
-            dataset_payload = {
+            # 根据API文档，parentId需要作为URL参数传递，而不是在请求体中
+            dataset_params = {
                 "parentId": ""  # 根目录下的知识库，空字符串或null
             }
             
-            # 查询参数
-            dataset_params = {}
+            # 添加查询参数
             if query:
                 dataset_params["name"] = query
                 logger.info(f"Filtering datasets with query: {query}")
 
             logger.info(f"Making request to FastGPT API for datasets: {self.api_url}{self.list_api_path}")
-            logger.info(f"Request payload: {dataset_payload}")
+            logger.info(f"Request params: {dataset_params}")
 
-            # 调用FastGPT的获取知识库列表API，使用POST请求
+            # 调用FastGPT的获取知识库列表API，使用POST请求，parentId作为URL参数
             dataset_response = requests.post(
                 f"{self.api_url}{self.list_api_path}",
                 headers=headers,
                 params=dataset_params,
-                json=dataset_payload,
+                json={},  # 请求体可以为空，parentId已在URL参数中传递
                 timeout=30  # 添加超时设置
             )
 
@@ -391,57 +391,7 @@ class FastGPTProvider(Retriever):
                 resources.append(dataset_resource)
                 logger.info(f"Added dataset resource: ID={dataset_id}, Name={dataset_name}")
                 
-                # 2. 获取该知识库下的集合列表
-                try:
-                    collection_payload = {
-                        "offset": 0,
-                        "pageSize": 10,  # 可以根据需要调整
-                        "datasetId": dataset_id,
-                        "parentId": None,
-                        "searchText": query if query else ""
-                    }
-                    
-                    logger.info(f"Making request to FastGPT API for collections of dataset {dataset_id}: {self.api_url}{self.collection_list_api_path}")
-                    logger.info(f"Request payload for collections: {collection_payload}")
-                    
-                    collection_response = requests.post(
-                        f"{self.api_url}{self.collection_list_api_path}",
-                        headers=headers,
-                        json=collection_payload,
-                        timeout=30
-                    )
-                    
-                    logger.info(f"API response status code for collections of dataset {dataset_id}: {collection_response.status_code}")
-                    
-                    if collection_response.status_code == 200:
-                        collection_result = collection_response.json()
-                        if collection_result.get("code") == 200:
-                            collections = collection_result.get("data", {}).get("list", [])
-                            logger.info(f"Retrieved {len(collections)} collections for dataset {dataset_id}")
-                            
-                            for collection in collections:
-                                collection_id = collection.get("_id") or collection.get("id")
-                                collection_name = collection.get("name", "") or collection.get("title", "")
-                                
-                                if not collection_id:
-                                    logger.warning(f"Skipping collection without ID: {collection}")
-                                    continue
-                                
-                                # 添加集合作为资源
-                                collection_resource = Resource(
-                                    uri=f"rag://dataset/{dataset_id}/collection/{collection_id}",
-                                    title=f"{dataset_name} - {collection_name}" if dataset_name else collection_name or f"Collection {collection_id}",
-                                    description=collection.get("intro", "")
-                                )
-                                resources.append(collection_resource)
-                                logger.info(f"Added collection resource: ID={collection_id}, Name={collection_name}")
-                    else:
-                        logger.warning(f"Failed to get collections for dataset {dataset_id}: {collection_response.status_code} - {collection_response.text}")
-                
-                except Exception as e:
-                    logger.error(f"Error fetching collections for dataset {dataset_id}: {e}")
-                    # 继续处理其他知识库，不中断整体流程
-                    continue
+                # 不获取和添加集合级资源，只返回知识库级资源
 
             logger.info(f"Successfully parsed {len(resources)} total resources (datasets and collections)")
             return resources
@@ -465,27 +415,43 @@ def parse_uri(uri: str) -> tuple[str, str, Optional[str]]:
         uri: The resource URI in format:
              - "rag://dataset/{dataset_id}#optional_document_id"
              - "rag://dataset/{dataset_id}/collection/{collection_id}#optional_document_id"
+             - 也支持直接传入dataset_id（特殊处理）
         
     Returns:
         A tuple of (dataset_id, collection_id, document_id)
     """
     parsed = urlparse(uri)
-    if parsed.scheme != "rag":
+    
+    # 特殊处理：如果URI直接是一个ID或没有rag://前缀，可能是直接传入的dataset_id
+    if parsed.scheme != "rag" or not uri.startswith("rag://"):
+        # 检查是否是一个纯dataset_id格式
+        import re
+        if re.match(r'^[a-zA-Z0-9]+$', uri.strip("/")):
+            return uri.strip("/"), None, None
+        
+        # 如果是纯路径格式如 /dataset_id
+        if uri.startswith("/"):
+            dataset_id = uri.strip("/")
+            if re.match(r'^[a-zA-Z0-9]+$', dataset_id):
+                return dataset_id, None, None
+        
         raise ValueError(f"Invalid URI scheme: {parsed.scheme}, expected 'rag'")
     
     # 提取dataset_id和可能的collection_id
     path_parts = parsed.path.strip("/").split("/")
-    if len(path_parts) < 2 or path_parts[0] != "dataset":
+    
+    # 支持两种格式：/dataset/{dataset_id} 或 直接是dataset_id
+    if len(path_parts) == 1:
+        # 可能是直接的dataset_id
+        return path_parts[0], None, parsed.fragment
+    elif len(path_parts) >= 2 and path_parts[0] == "dataset":
+        dataset_id = path_parts[1]
+        collection_id = None
+        
+        # 检查是否包含collection
+        if len(path_parts) >= 4 and path_parts[2] == "collection":
+            collection_id = path_parts[3]
+        
+        return dataset_id, collection_id, parsed.fragment
+    else:
         raise ValueError(f"Invalid URI path format: {parsed.path}, expected '/dataset/{{dataset_id}}' or '/dataset/{{dataset_id}}/collection/{{collection_id}}'")
-    
-    dataset_id = path_parts[1]
-    collection_id = None
-    
-    # 检查是否包含collection
-    if len(path_parts) >= 4 and path_parts[2] == "collection":
-        collection_id = path_parts[3]
-    
-    # fragment部分作为document_id（如果有）
-    document_id = parsed.fragment
-    
-    return dataset_id, collection_id, document_id
