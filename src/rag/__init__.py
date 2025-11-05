@@ -3,6 +3,7 @@
 
 from .builder import build_retriever
 from .dify import DifyProvider
+from .fastgpt import FastGPTProvider
 from .moi import MOIProvider
 from .ragflow import RAGFlowProvider
 from .retriever import Chunk, Document, Resource, Retriever
@@ -13,6 +14,7 @@ __all__ = [
     Document,
     Resource,
     DifyProvider,
+    FastGPTProvider,
     RAGFlowProvider,
     MOIProvider,
     VikingDBKnowledgeBaseProvider,

@@ -3,6 +3,7 @@
 
 from src.config.tools import SELECTED_RAG_PROVIDER, RAGProvider
 from src.rag.dify import DifyProvider
+from src.rag.fastgpt import FastGPTProvider
 from src.rag.milvus import MilvusProvider
 from src.rag.moi import MOIProvider
 from src.rag.ragflow import RAGFlowProvider
@@ -21,6 +22,8 @@ def build_retriever() -> Retriever | None:
         return VikingDBKnowledgeBaseProvider()
     elif SELECTED_RAG_PROVIDER == RAGProvider.MILVUS.value:
         return MilvusProvider()
+    elif SELECTED_RAG_PROVIDER == RAGProvider.FASTGPT.value:
+        return FastGPTProvider()
     elif SELECTED_RAG_PROVIDER:
         raise ValueError(f"Unsupported RAG provider: {SELECTED_RAG_PROVIDER}")
     return None
