@@ -23,14 +23,26 @@ export function mergeMessage(message: Message, event: ChatEvent) {
   } else if (event.type === "interrupt") {
     mergeInterruptMessage(message, event);
   }
-  if (event.data.finish_reason) {
+  // 安全处理finish_reason和toolCalls解析
+  if (event.data?.finish_reason) {
     message.finishReason = event.data.finish_reason;
     message.isStreaming = false;
-    if (message.toolCalls) {
+    if (message.toolCalls && Array.isArray(message.toolCalls)) {
       message.toolCalls.forEach((toolCall) => {
-        if (toolCall.argsChunks?.length) {
-          toolCall.args = JSON.parse(toolCall.argsChunks.join(""));
-          delete toolCall.argsChunks;
+        if (toolCall.argsChunks && Array.isArray(toolCall.argsChunks) && toolCall.argsChunks.length > 0) {
+          try {
+            // 添加try-catch避免JSON解析错误导致整个应用崩溃
+            const argsJson = toolCall.argsChunks.join("");
+            if (argsJson.trim()) { // 确保不为空字符串
+              toolCall.args = JSON.parse(argsJson);
+            }
+            delete toolCall.argsChunks;
+          } catch (error) {
+            console.error('Failed to parse tool call args JSON:', error, toolCall.argsChunks);
+            // 解析失败时使用空对象作为fallback
+            toolCall.args = {};
+            delete toolCall.argsChunks;
+          }
         }
       });
     }
@@ -58,18 +70,24 @@ function mergeToolCallMessage(
   message: Message,
   event: ToolCallsEvent | ToolCallChunksEvent,
 ) {
-  if (event.type === "tool_calls" && event.data.tool_calls[0]?.name) {
+  // 安全处理tool_calls事件
+  if (event.type === "tool_calls" && event.data?.tool_calls && Array.isArray(event.data.tool_calls) && event.data.tool_calls[0]?.name) {
     message.toolCalls = event.data.tool_calls.map((raw) => ({
-      id: raw.id,
-      name: raw.name,
-      args: raw.args,
+      id: raw.id || '',
+      name: raw.name || '',
+      args: raw.args || {},
       result: undefined,
     }));
   }
 
   message.toolCalls ??= [];
-  for (const chunk of event.data.tool_call_chunks) {
-    const convertedArgs = convertToolChunkArgs(chunk.args);
+  
+  // 确保event.data.tool_call_chunks存在且为数组
+  const toolCallChunks = event.data?.tool_call_chunks && Array.isArray(event.data.tool_call_chunks) ? event.data.tool_call_chunks : [];
+  for (const chunk of toolCallChunks) {
+    if (!chunk) continue; // 跳过null或undefined的chunk
+    
+    const convertedArgs = convertToolChunkArgs(chunk.args || '');
     
     // 跳过空的或无效的chunks
     if (!convertedArgs || convertedArgs.trim() === '') {
@@ -95,7 +113,7 @@ function mergeToolCallMessage(
         streamingToolCall = {
           id: '',
           name: '',
-          args: undefined,
+          args: {}, // 使用空对象替代undefined以符合Record<string, unknown>类型
           argsChunks: [convertedArgs],
           result: undefined,
         };
@@ -117,15 +135,21 @@ function mergeToolCallResultMessage(
   message: Message,
   event: ToolCallResultEvent,
 ) {
-  const toolCall = message.toolCalls?.find(
-    (toolCall) => toolCall.id === event.data.tool_call_id,
-  );
-  if (toolCall) {
-    toolCall.result = event.data.content;
+  // 添加完整的空值检查
+  if (message.toolCalls && Array.isArray(message.toolCalls) && event.data?.tool_call_id) {
+    const toolCall = message.toolCalls.find(
+      (toolCall) => toolCall.id === event.data.tool_call_id,
+    );
+    if (toolCall) {
+      toolCall.result = event.data.content ?? '';
+    }
   }
 }
 
 function mergeInterruptMessage(message: Message, event: InterruptEvent) {
   message.isStreaming = false;
-  message.options = event.data.options;
+  // 安全设置options，确保event.data存在
+  if (event.data) {
+    message.options = event.data.options || {};
+  }
 }
