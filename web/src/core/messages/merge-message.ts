@@ -69,19 +69,47 @@ function mergeToolCallMessage(
 
   message.toolCalls ??= [];
   for (const chunk of event.data.tool_call_chunks) {
+    const convertedArgs = convertToolChunkArgs(chunk.args);
+    
+    // 跳过空的或无效的chunks
+    if (!convertedArgs || convertedArgs.trim() === '') {
+      continue;
+    }
+    
     if (chunk.id) {
       const toolCall = message.toolCalls.find(
         (toolCall) => toolCall.id === chunk.id,
       );
       if (toolCall) {
-        toolCall.argsChunks = [convertToolChunkArgs(chunk.args)];
+        // 对于有id的chunk，直接设置为新的argsChunks
+        toolCall.argsChunks = [convertedArgs];
       }
     } else {
-      const streamingToolCall = message.toolCalls.find(
+      // 先查找现有的streaming tool call
+      let streamingToolCall = message.toolCalls.find(
         (toolCall) => toolCall.argsChunks?.length,
       );
-      if (streamingToolCall) {
-        streamingToolCall.argsChunks!.push(convertToolChunkArgs(chunk.args));
+      
+      // 如果没有找到现有的streaming tool call，创建一个新的
+      if (!streamingToolCall) {
+        streamingToolCall = {
+          id: '',
+          name: '',
+          args: undefined,
+          argsChunks: [convertedArgs],
+          result: undefined,
+        };
+        message.toolCalls.push(streamingToolCall);
+      } else {
+        // 优化：合并连续的chunk到同一个数组元素
+        // 这对于处理单个字符的Unicode序列（如"8", "\u", "4", "f", "5"）特别重要
+        if (!streamingToolCall.argsChunks) {
+          streamingToolCall.argsChunks = [];
+        }
+        
+        // 总是将当前chunk追加到最后一个chunk上，避免单个字符渲染
+        const lastChunk = streamingToolCall.argsChunks[streamingToolCall.argsChunks.length - 1] || '';
+        streamingToolCall.argsChunks[streamingToolCall.argsChunks.length - 1] = lastChunk + convertedArgs;
       }
     }
   }

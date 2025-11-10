@@ -181,16 +181,40 @@ export async function sendMessage(
       
       message ??= getMessage(messageId);
       if (message) {
-        message = mergeMessage(message, event);
-        // Collect pending messages for update, instead of updating immediately.
-        pendingUpdates.set(message.id, message);
-        scheduleUpdate();
+        try {
+          // 单独处理每个事件的合并，避免一个事件的错误影响整个流
+          message = mergeMessage(message, event);
+          // Collect pending messages for update, instead of updating immediately.
+          pendingUpdates.set(message.id, message);
+          scheduleUpdate();
+        } catch (mergeError) {
+          // 只在开发环境记录合并错误，不向用户显示
+          if (process.env.NODE_ENV === "development") {
+            console.warn(`Error merging message for event type ${type}:`, mergeError);
+          }
+          // 继续处理下一个事件，不中断整个流
+          continue;
+        }
       }
     }
-  } catch {
-    toast("An error occurred while generating the response. Please try again.");
+  } catch (error) {
+    // 增强错误处理，区分回放模式和普通模式
+    const isReplayMode = window.location.search.includes("replay=") || 
+                         window.location.search.includes("mock") ||
+                         window.location.search.includes("thread_id=");
+    
+    // 在开发环境记录详细错误信息
+    if (process.env.NODE_ENV === "development") {
+      console.error("Chat stream error:", error);
+    }
+    
+    // 只有在非回放模式下才显示错误提示
+    // 回放模式下的错误通常是数据格式问题，我们不希望打扰用户体验
+    if (!isReplayMode) {
+      toast("An error occurred while generating the response. Please try again.");
+    }
+    
     // Update message status.
-    // TODO: const isAborted = (error as Error).name === "AbortError";
     if (messageId != null) {
       const message = getMessage(messageId);
       if (message?.isStreaming) {

@@ -160,28 +160,57 @@ async function* chatReplayStream(
     const [, data] = dataRaw.split("data: ", 2) as [string, string];
 
     try {
-      const chatEvent = {
-        type: event,
-        data: JSON.parse(data),
-      } as ChatEvent;
-      if (chatEvent.type === "message_chunk") {
-        if (!chatEvent.data.finish_reason) {
-          await sleepInReplay(50);
-        }
-      } else if (chatEvent.type === "tool_call_result") {
-        await sleepInReplay(500);
-      }
-      yield chatEvent;
-      if (chatEvent.type === "tool_call_result") {
-        await sleepInReplay(800);
-      } else if (chatEvent.type === "message_chunk") {
-        if (chatEvent.data.role === "user") {
+        const chatEvent = {
+          type: event,
+          data: JSON.parse(data),
+        } as ChatEvent;
+        
+        // 为不同类型的事件添加适当的延迟
+        if (chatEvent.type === "message_chunk") {
+          if (!chatEvent.data.finish_reason) {
+            // 根据内容长度动态调整延迟，单个字符使用较小延迟，较长内容使用标准延迟
+            const contentLength = chatEvent.data.content ? chatEvent.data.content.length : 0;
+            const delayMs = contentLength <= 1 ? 20 : 50;
+            await sleepInReplay(delayMs);
+          }
+        } else if (chatEvent.type === "tool_call_result") {
           await sleepInReplay(500);
+        } else if (chatEvent.type === "tool_call_chunks") {
+          // 为tool_call_chunks添加适当的延迟，对于单个字符的Unicode序列使用较小延迟
+          const argsLength = chatEvent.data.tool_call_chunks?.[0]?.args ? chatEvent.data.tool_call_chunks[0].args.length : 0;
+          const delayMs = argsLength <= 1 ? 10 : 30;
+          await sleepInReplay(delayMs);
+        } else if (chatEvent.type === "tool_calls") {
+          // 为tool_calls添加前置延迟
+          await sleepInReplay(100);
         }
+        
+        yield chatEvent;
+        
+        // 事件生成后的延迟
+        if (chatEvent.type === "tool_call_result") {
+          await sleepInReplay(800);
+        } else if (chatEvent.type === "message_chunk") {
+          if (chatEvent.data.role === "user") {
+            await sleepInReplay(500);
+          }
+        } else if (chatEvent.type === "tool_calls") {
+          // 工具调用后的延迟
+          await sleepInReplay(300);
+        }
+        // 为连续的tool_call_chunks事件添加额外的缓冲时间
+        else if (chatEvent.type === "tool_call_chunks") {
+          // 当检测到可能是Unicode字符序列时，添加较小的延迟
+          const argsLength = chatEvent.data.tool_call_chunks?.[0]?.args ? chatEvent.data.tool_call_chunks[0].args.length : 0;
+          if (argsLength <= 1) {
+            await sleepInReplay(5);
+          }
+        }
+      } catch (e) {
+        console.error(e);
+        // 更好的错误处理，避免因为单个事件解析错误而影响整个回放
+        // 可以考虑生成一个错误消息事件，而不是默默忽略
       }
-    } catch (e) {
-      console.error(e);
-    }
   }
 }
 
