@@ -103,12 +103,10 @@ function mergeToolCallMessage(
       } else {
         // 优化：合并连续的chunk到同一个数组元素
         // 这对于处理单个字符的Unicode序列（如"8", "\u", "4", "f", "5"）特别重要
-        if (!streamingToolCall.argsChunks) {
-          streamingToolCall.argsChunks = [];
-        }
+        streamingToolCall.argsChunks ??= [];
         
         // 总是将当前chunk追加到最后一个chunk上，避免单个字符渲染
-        const lastChunk = streamingToolCall.argsChunks[streamingToolCall.argsChunks.length - 1] || '';
+        const lastChunk = streamingToolCall.argsChunks[streamingToolCall.argsChunks.length - 1] ?? '';
         streamingToolCall.argsChunks[streamingToolCall.argsChunks.length - 1] = lastChunk + convertedArgs;
       }
     }
